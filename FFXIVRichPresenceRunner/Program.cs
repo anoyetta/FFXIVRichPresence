@@ -1,11 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Windows.Forms;
 using DiscordRPC;
 using Newtonsoft.Json;
 
@@ -29,18 +31,18 @@ namespace FFXIVRichPresenceRunner
 
         private static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.UnhandledException += delegate(object sender, UnhandledExceptionEventArgs eventArgs)
+            AppDomain.CurrentDomain.UnhandledException += delegate (object sender, UnhandledExceptionEventArgs eventArgs)
             {
                 File.WriteAllText("RichPresenceException.txt", eventArgs.ExceptionObject.ToString());
-                    
+
                 Process.GetCurrentProcess().Kill();
             };
 
             _ffxivProcess = Process.GetProcessById(int.Parse(args[0]));
 
-            #if !DEBUG
+#if !DEBUG
             ShowWindow(GetConsoleWindow(), SW_HIDE);
-            #endif
+#endif
 
             Run();
 
@@ -74,6 +76,7 @@ namespace FFXIVRichPresenceRunner
             var discordManager = new Discord(DefaultPresence, ClientID);
 
             var game = new Nhaama.FFXIV.Game(_ffxivProcess);
+            var ignores = LoadIgnoreList();
 
             Console.WriteLine(game.Process.GetSerializer().SerializeObject(game.Definitions, Formatting.Indented));
 
@@ -99,7 +102,7 @@ namespace FFXIVRichPresenceRunner
                 {
                     var player = game.ActorTable[0];
 
-                    if(player.ActorID == 0)
+                    if (player.ActorID == 0)
                     {
                         discordManager.SetPresence(DefaultPresence);
                         continue;
@@ -135,7 +138,9 @@ namespace FFXIVRichPresenceRunner
 
                     discordManager.SetPresence(new RichPresence
                     {
-                        Details = $"{player.Name}{fcName}",
+                        Details = isIgnore(player.Name) ?
+                            "** SECRET **" :
+                            $"{player.Name}{fcName}",
                         State = worldName,
                         Assets = new Assets
                         {
@@ -146,10 +151,48 @@ namespace FFXIVRichPresenceRunner
                         }
                     });
                 }
-                
 
                 Thread.Sleep(1000);
             }
+
+            bool isIgnore(string name)
+            {
+                if (ignores == null ||
+                    ignores.Length < 1)
+                {
+                    return false;
+                }
+
+                return ignores.Any(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        private static string[] LoadIgnoreList()
+        {
+            var file = Assembly.GetExecutingAssembly().Location
+                .Replace(".exe", ".ignore.txt");
+
+            if (!File.Exists(file))
+            {
+                return default;
+            }
+
+            var ignores = new List<string>();
+            using (var reader = new StreamReader(file, new UTF8Encoding(false)))
+            {
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine().Trim();
+
+                    if (!string.IsNullOrEmpty(line) &&
+                        !line.StartsWith("#"))
+                    {
+                        ignores.Add(line);
+                    }
+                }
+            }
+
+            return ignores.ToArray();
         }
     }
 }
