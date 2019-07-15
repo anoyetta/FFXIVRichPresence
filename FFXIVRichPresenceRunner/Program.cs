@@ -77,6 +77,8 @@ namespace FFXIVRichPresenceRunner
 
         public static async void Run()
         {
+            Thread.CurrentThread.Priority = ThreadPriority.Lowest;
+
             var discordManager = new Discord(DefaultPresence, ClientID);
 
             var game = new Nhaama.FFXIV.Game(_ffxivProcess);
@@ -99,6 +101,7 @@ namespace FFXIVRichPresenceRunner
                 if (game.ActorTable == null)
                 {
                     discordManager.SetPresence(DefaultPresence);
+                    Thread.Sleep(5000);
                     continue;
                 }
 
@@ -109,6 +112,7 @@ namespace FFXIVRichPresenceRunner
                     if (player.ActorID == 0)
                     {
                         discordManager.SetPresence(DefaultPresence);
+                        Thread.Sleep(5000);
                         continue;
                     }
 
